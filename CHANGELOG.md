@@ -1,13 +1,17 @@
-# @wownik/connector-twitch
+# @logto/connector-twitch
 
-## 1.8.0 (Twitch Connector)
+## 1.0.0 (Twitch Connector)
 
-### Minor Changes
+### Initial Release
 
-- Initial release of Twitch OAuth connector for Logto
+- Custom OAuth connector implementation for Logto to integrate with Twitch
 - Supports user authentication via Twitch OAuth 2.0 / OpenID Connect
 - Profile mapping from Twitch's nested response structure
 - Token storage support for accessing Twitch APIs
+
+**Important**: This is a custom implementation, not an official Twitch product.
+
+**Configuration values for Twitch:**
 
 **Configuration values for Twitch:**
 - `authorizationEndpoint`: `https://id.twitch.tv/oauth2/authorize`
@@ -20,7 +24,7 @@
 {
   "id": "data.0.id",
   "name": "data.0.display_name",
-  "email": "data.0.email",
+  "email": "data.0.email", 
   "avatar": "data.0.profile_image_url"
 }
 ```
@@ -35,19 +39,14 @@
 }
 ```
 
-**Token Response:**
+**Token Response Structure:**
 - Returns JSON format (not query string)
 - Includes `id_token` when using OpenID Connect scopes
 - Supports refresh tokens with `offline_access` scope
 - Scopes returned as array: `scope: ["channel:moderate", "chat:edit", ...]`
 
-**Token Response:**
-- Returns JSON format (not query string)
-- Includes `id_token` when using OpenID Connect scopes
-- Supports refresh tokens with `offline_access` scope
-
 ### See Also
 
 - [Twitch Developer Documentation](https://dev.twitch.tv/docs/authentication/getting-started)
-- [Twitch Helix API](https://dev.twitch.tv/docs/api/reference/#get-users)
+- [Twitch Helix API Reference](https://dev.twitch.tv/docs/api/reference/)
 - [OpenID Connect Discovery Response](https://id.twitch.tv/oauth2/keys)

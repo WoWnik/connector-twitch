@@ -1,7 +1,7 @@
 {
   "name": "@wownik/connector-twitch",
   "version": "1.0.0",
-  "description": "OAuth standard connector implementation.",
+  "description": "Custom OAuth connector implementation for Logto to integrate with Twitch. Not an official Twitch product.",
   "author": "wownik <wownik98@gmail.com>",
   "dependencies": {
     "@logto/connector-kit": "workspace:^",

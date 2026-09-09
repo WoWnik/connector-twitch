@@ -1,8 +1,24 @@
-# Twitch OAuth Connector
+# @logto/connector-twitch
 
-The un official Logto connector for Twitch via OAuth 2.0 protocol.
+**Community-maintained**: A custom implementation of the Logto OAuth connector for Twitch authentication. Not an official Twitch product, but enables Logto to authenticate users via their Twitch accounts.
 
-This connector enables Logto to authenticate users using their Twitch accounts, sync profile information (display name, avatar, etc.), and optionally store access tokens for API access.
+This connector enables Logto to authenticate users using their Twitch accounts, sync profile information (display name, avatar, email), and optionally store access tokens for API access through Logto [Secret Vault](https://docs.logto.io/secret-vault).
+
+## Important Note
+
+- This is **NOT** an official Twitch connector
+- It's a custom implementation based on the [Logto OAuth connector framework](https://github.com/logto-io/connectors)
+- For official support, please contact [Logto Support](https://logto.io/contact)
+- Refer to [Twitch Developer Documentation](https://dev.twitch.tv/docs/authentication/getting-started) for Twitch-specific requirements
+
+## Important Note
+
+- This is **NOT** an official Twitch connector
+- It's a custom implementation based on the [Logto OAuth connector framework](https://github.com/logto-io/connectors)
+- For official support, please contact [Logto Support](https://logto.io/contact)
+- Refer to [Twitch Developer Documentation](https://dev.twitch.tv/docs/authentication/getting-started) for Twitch-specific requirements
+
+This connector enables Logto to authenticate users using their Twitch accounts, sync profile information (display name, avatar, email), and optionally store access tokens for API access through Logto [Secret Vault](https://docs.logto.io/secret-vault).
 
 ## Table of contents
 
@@ -12,7 +28,6 @@ This connector enables Logto to authenticate users using their Twitch accounts, 
 - [Config types](#config-types)
 - [General settings](#general-settings)
 - [Utilize the OAuth connector](#utilize-the-oauth-connector)
-- [Manage user's social identity](#manage-users-social-identity)
 - [Twitch-specific setup](#twitch-specific-setup)
 
 ## Get started
@@ -65,14 +80,13 @@ To configure the Twitch connector in Logto Console, use the values from the disc
 |-----------|-------|
 | `authorizationEndpoint` | `https://id.twitch.tv/oauth2/authorize` |
 | `tokenEndpoint` | `https://id.twitch.tv/oauth2/token` |
-| `userInfoEndpoint` | `https://id.twitch.tv/oauth2/userinfo` (OpenID Connect) <br> OR leave empty to use Helix API directly |
+| `userInfoEndpoint` | `https://id.twitch.tv/oauth2/userinfo` (OpenID Connect) OR empty for Helix API |
 | `clientId` | Your Twitch Client ID |
 | `clientSecret` | Your Twitch Client Secret |
-| `scope` | `openid email profile offline_access channel:moderate chat:edit` (OpenID Connect) <br> OR `user:read:* twitch_channel:*` (Helix API scopes) |
+| `scope` | `openid email profile offline_access channel:moderate chat:edit` (OpenID Connect) OR `user:read:* twitch_channel:*` (Helix API scopes) |
 | `tokenEndpointResponseType` | `json` (Twitch returns token response as JSON, not query string) |
-| `profileMap` | See [Profile Mapping for Twitch](#profile-mapping-for-twitch-helix-api) or [OpenID Connect](#profile-mapping-for-twitch-openid-connect) section above |
 
-### Important: Token Response Structure
+### Token Response Structure
 
 Twitch returns the following structure when exchanging authorization code:
 
@@ -154,85 +168,24 @@ Configure the `profileMap` for OpenID Connect userinfo:
 }
 ```
 
-**Recommendation**: Use OpenID Connect userinfo endpoint when available (simpler response). Helix API is better for accessing additional Twitch-specific data like broadcaster type, description, etc.
-
-### Profile Mapping for Twitch
-
-Twitch returns profile data with nested structure. When using the userinfo endpoint (`https://id.twitch.tv/oauth2/userinfo`), the response is typically flat, but when accessing via Helix API endpoints, it returns a `data` array.
-
-**Using OpenID Connect userinfo endpoint:**
-```json
-{
-  "sub": "unique-user-id",
-  "preferred_username": "twitch_username",
-  "email": "user@example.com",
-  "picture": "https://static-cdn.jtvnw.net/user-avatar/128x128.png"
-}
-```
-
-**Using Helix API (nested structure):**
-```json
-{
-  "data": [
-    {
-      "id": "unique-user-id",
-      "login": "twitch_username",
-      "display_name": "Display Name",
-      "type": "", 
-      "broadcaster_type": "partner",
-      "description": "..."
-    }
-  ]
-}
-```
-
-Configure the `profileMap` accordingly:
-
-```json
-{
-  "id": "sub",
-  "name": "preferred_username",
-  "email": "email",
-  "avatar": "picture"
-}
-```
-
-**Note**: The discovery response shows `preferred_username` as the field name (maps to display_name in Twitch UI).
-
 ## Config types
 
-| Name                      | Type                   | Required |
-|---------------------------|------------------------|----------|
-| authorizationEndpoint     | string                 | true     |
-| userInfoEndpoint          | string                 | true     |
-| clientId                  | string                 | true     |
-| clientSecret              | string                 | true     |
-| tokenEndpointResponseType | enum                   | false    |
-| responseType              | string                 | false    |
-| grantType                 | string                 | false    |
-| tokenEndpoint             | string                 | false    |
-| scope                     | string                 | false    |
-| customConfig              | Record<string, string> | false    |
-| profileMap                | ProfileMap             | false    |
-
-| ProfileMap fields | Type   | Required | Default value |
-|-------------------|--------|----------|---------------|
-| id                | string | false    | id            |
-| name              | string | false    | name          |
-| avatar            | string | false    | avatar        |
-| email             | string | false    | email         |
-| phone             | string | false    | phone         |
+| Name | Type | Required | Default |
+|------|------|----------|---------|
+| authorizationEndpoint | string | true | - |
+| userInfoEndpoint | string | false (for OpenID Connect) OR leave empty for Helix API | `https://id.twitch.tv/oauth2/userinfo` |
+| clientId | string | true | - |
+| clientSecret | string | true | - |
+| tokenEndpointResponseType | enum | false | `json` |
+| scope | string | false | `openid email profile offline_access` |
 
 ## General settings
-
-Here are some general settings that won't block the connection to your identity provider but may affect the end-user authentication experience.
 
 ### Social button name and logo
 
 For Twitch social button, use:
 - **Name**: `Twitch`
 - **Logo**: Official Twitch logo from [Twimg](https://uploads-ssl.webflow.com/524d8c475f0d7e9bc6a967b3/6250dae16651201494a6d0dd%2FTwitch_Logo_CMYK_Flatten.png)
-  - Use this URL for both light and dark mode (or use a transparent PNG if available)
 
 ### Identity provider name
 
@@ -240,74 +193,19 @@ Use `twitch` as the identity provider name to differentiate Twitch user identiti
 
 ### Sync profile information
 
-Twitch profile sync using OpenID Connect:
+Twitch profile sync considerations:
 - **Avatar**: Use `picture` claim from the ID token or userinfo endpoint response
 - **Display name**: Maps from `preferred_username` field in user info
 - **Email**: Available via `email` claim when requested with appropriate scopes
 - **Sub**: Unique identifier (`sub` claim in ID token) - maps to Logto's `id` field
 
-**Using ID Token**: When using `openid` scope, you'll receive an ID token containing:
-- `sub`: User's unique identifier
-- `preferred_username`: Twitch username (display name)
-- `email`: User email address (if available and consented)
-- `picture`: Avatar URL
-- Other standard OpenID Connect claims
-
 ### Store tokens to access third-party APIs (Optional)
 
-If you want to access the Identity Provider's APIs and perform actions with user authorization (whether via social sign-in or account linking), Logto needs to get specific API scopes and store tokens.
+If you want to access the Identity Provider's APIs and perform actions with user authorization:
 
 1. Add the required scopes in the **scope** field following the instructions above
 2. Enable **Store tokens for persistent API access** in the Logto OAuth connector. Logto will securely [store access tokens](https://docs.logto.io/secret-vault/federated-token-set) in the Secret Vault.
 3. For Twitch, ensure the `offline_access` scope is included to obtain a refresh token and prevent repeated consent prompts.
-
-## Twitch-specific setup
-
-### Important Notes for Twitch Integration
-
-1. **Nested Response Structure (Helix API)**: When using Helix API (`https://api.twitch.tv/helix/users`), responses come with a `data` array:
-   ```json
-   {
-     "data": [
-       {
-         "id": "unique-id",
-         "login": "username",
-         "display_name": "Display Name",
-         "profile_image_url": "https://..."
-       }
-     ]
-   }
-   ```
-   **Profile Map for Helix API**:
-   ```json
-   {
-     "id": "data.0.id",
-     "name": "data.0.display_name",
-     "email": "data.0.email",
-     "avatar": "data.0.profile_image_url"
-   }
-   ```
-
-2. **OpenID Connect Support**: Twitch also supports OpenID Connect via the `userinfo_endpoint` (`https://id.twitch.tv/oauth2/userinfo`). When using this endpoint:
-   - Response is flat (not nested)
-   - Fields: `sub`, `preferred_username`, `email`, `picture`
-   - Email is included when requested
-   - **Profile Map**:
-     ```json
-     {
-       "id": "sub",
-       "name": "preferred_username",
-       "email": "email",
-       "avatar": "picture"
-     }
-     ```
-
-3. **Avatar Handling**: The `picture` claim in ID tokens or from userinfo endpoint provides the avatar URL.
-
-4. **Token Storage**: For accessing Twitch APIs after authentication:
-   - Enable token storage in Logto Console
-   - Use `offline_access` scope to get refresh tokens
-   - Retrieve tokens from Secret Vault for API calls
 
 ## Utilize the OAuth connector
 
@@ -321,8 +219,6 @@ Once you've created an OAuth connector and connected it to your identity provide
 
 Learn more about [social sign-in experience](https://docs.logto.io/end-user-flows/sign-up-and-sign-in/social-sign-in).
 
-**Note**: For account linking scenarios, use [Logto Account API](https://docs.logto.io/end-user-flows/account-settings/by-account-api#link-a-new-social-connection) to let users link their Twitch accounts.
-
 ### Access identity provider APIs and perform actions
 
 Your application can retrieve stored access tokens from the Secret Vault to call your identity provider's APIs and automate backend tasks. The specific capabilities depend on your identity provider and the scopes you've requested.
@@ -332,15 +228,20 @@ For Twitch, with `openid` scope:
 - Store tokens to access [Twitch API](https://dev.twitch.tv/docs/api/) for moderation, analytics, or other actions
 - The ID token supports `RS256` signing algorithm (see [`jwks_uri`](#) for key verification)
 
-## Manage user's social identity
+## Twitch-specific setup
 
-After a user links their Twitch account, admins can manage that connection in the Logto Console:
+### Important Notes for Twitch Integration
 
-1. Navigate to [Logto console > User management](https://cloud.logto.io/to/users) and open the user's profile.
-2. Under **Social connections**, locate the Twitch item and click **Manage**.
-3. On this page, admins can manage the user's Twitch connection, see all profile information granted and synced from their Twitch account, and check the [access token status](https://docs.logto.io/secret-vault/federated-token-set/token-status).
+1. **Nested Response Structure (Helix API)**: When using Helix API (`https://api.twitch.tv/helix/users`), responses come with a `data` array. Use profile mapping with `data.0.*` paths.
 
-**Note**: The discovery response shows that Twitch supports `openid` scope for OpenID Connect flow. However, many third-party integrations prefer using the Helix API with `user:read:*` scopes instead.
+2. **OpenID Connect Support**: Twitch also supports OpenID Connect via the `userinfo_endpoint`. When using this endpoint, response is flat with `sub`, `preferred_username`, `email`, `picture` fields.
+
+3. **RS256 ID Token Verification**: The `id_token` provided by Twitch is signed using RS256 algorithm. Fetch JWKS from `https://id.twitch.tv/oauth2/keys` for verification (supported by jose v6).
+
+4. **Token Storage**: For accessing Twitch APIs after authentication:
+   - Enable token storage in Logto Console
+   - Use `offline_access` scope to get refresh tokens
+   - Retrieve tokens from Secret Vault for API calls
 
 ## Reference
 
@@ -349,14 +250,3 @@ After a user links their Twitch account, admins can manage that connection in th
 * [Twitch Helix API Reference](https://dev.twitch.tv/docs/api/reference/)
 * [OAuth 2.0 Authorization Framework (RFC 6749)](https://www.rfc-editor.org/rfc/rfc6749)
 * [OpenID Connect Core 1.0 (RFC 6742)](https://www.rfc-editor.org/rfc/rfc6742)
-
-### RS256 ID Token Verification
-
-The `id_token` provided by Twitch is signed using **RS256** algorithm.
-
-To verify the ID token:
-1. Fetch the JWKS (JSON Web Key Set) from [`jwks_uri`](#): `https://id.twitch.tv/oauth2/keys`
-2. Use the public key to verify the JWT signature
-3. Decode and validate the claims (`sub`, `preferred_username`, etc.)
-
-This is supported by **jose v6** in the connector, which uses the Web Crypto API for signature verification.
