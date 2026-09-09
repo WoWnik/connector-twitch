@@ -4,13 +4,13 @@
   "description": "Custom OAuth connector implementation for Logto to integrate with Twitch. Not an official Twitch product.",
   "author": "wownik <wownik98@gmail.com>",
   "dependencies": {
-    "@logto/connector-kit": "workspace:^",
-    "@logto/shared": "workspace:^",
-    "@silverhand/essentials": "^2.9.1",
-    "jose": "^6.2.3",
-    "ky": "^1.2.3",
-    "query-string": "^9.0.0",
-    "snakecase-keys": "^8.0.1",
+    "@logto/connector-kit": "^5.1.1",
+    "@logto/shared": "^3.4.3",
+    "@silverhand/essentials": "^2.9.3",
+    "jose": "^6.2.12",
+    "ky": "^1.14.3",
+    "query-string": "^9.5.1",
+    "snakecase-keys": "^8.1.0",
     "zod": "3.24.3"
   },
   "main": "./lib/index.js",
@@ -59,16 +59,17 @@
   "devDependencies": {
     "@silverhand/eslint-config": "6.0.1",
     "@silverhand/ts-config": "6.0.0",
-    "@types/node": "^22.14.0",
-    "@types/supertest": "^6.0.2",
-    "@vitest/coverage-v8": "^4.1.8",
-    "eslint": "^8.56.0",
-    "lint-staged": "^15.0.2",
-    "nock": "^14.0.3",
-    "prettier": "^3.5.3",
-    "supertest": "^7.0.0",
+    "@types/node": "^22.20.2",
+    "@types/supertest": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^8.57.1",
+    "lint-staged": "^15.5.2",
+    "nock": "^14.0.17",
+    "prettier": "^3.9.6",
+    "supertest": "^7.2.2",
     "tsup": "^8.5.1",
-    "typescript": "^5.5.3",
-    "vitest": "^4.1.8"
-  }
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  },
+  "packageManager": "pnpm@12.3.4+sha512.961aa41fb077da3a04a441d9f8e15ebc0c96da8ef710b2eb67bf9ee7cb0610eabd48f1fd85f51cffe73846785fa0f87c56a3a872a1d893f8446741b5cce45457"
 }
