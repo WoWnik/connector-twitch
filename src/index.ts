@@ -1,144 +1,159 @@
-import { assert, conditional, pick } from '@silverhand/essentials';
+import { assert } from '@silverhand/essentials';
+import { got, HTTPError } from 'got';
 
+import type {
+  CreateConnector,
+  GetAuthorizationUri,
+  GetConnectorConfig,
+  GetUserInfo,
+  SocialConnector,
+} from '@logto/connector-kit';
 import {
-  type GetAuthorizationUri,
-  type GetUserInfo,
-  type SocialConnector,
-  type CreateConnector,
-  type GetConnectorConfig,
-  parseJsonObject,
   ConnectorError,
   ConnectorErrorCodes,
-  validateConfig,
   ConnectorType,
-  type GetTokenResponseAndUserInfo,
-  type GetAccessTokenByRefreshToken,
+  parseJson,
+  socialUserInfoGuard,
+  validateConfig,
 } from '@logto/connector-kit';
-import ky, { HTTPError } from 'ky';
 
-import { defaultMetadata, defaultTimeout } from './constant.js';
-import { constructAuthorizationUri } from './oauth2/utils.js';
-import { type Oauth2ConnectorConfig, oauth2ConnectorConfigGuard } from './types.js';
 import {
-  userProfileMapping,
-  getAccessToken,
-  getAccessTokenByRefreshToken as _getAccessTokenByRefreshToken,
-} from './utils.js';
-
-export * from './oauth2/index.js';
+  accessTokenEndpoint,
+  authorizationEndpoint,
+  defaultMetadata,
+  defaultTimeout,
+  scope as defaultScope,
+  userInfoEndpoint,
+} from './constant.js';
+import type { TwitchConfig } from './types.js';
+import {
+  accessTokenResponseGuard,
+  authResponseGuard,
+  twitchConfigGuard,
+  userInfoResponseGuard,
+} from './types.js';
 
 const getAuthorizationUri =
   (getConfig: GetConnectorConfig): GetAuthorizationUri =>
-  async ({ state, redirectUri, scope }, setSession) => {
+  async ({ state, redirectUri, scope }) => {
     const config = await getConfig(defaultMetadata.id);
-    validateConfig(config, oauth2ConnectorConfigGuard);
-    const parsedConfig = oauth2ConnectorConfigGuard.parse(config);
+    validateConfig(config, twitchConfigGuard);
 
-    await setSession({ redirectUri });
-
-    const { authorizationEndpoint, customConfig } = parsedConfig;
-
-    return constructAuthorizationUri(authorizationEndpoint, {
-      ...pick(parsedConfig, 'responseType', 'clientId', 'scope'),
-      redirectUri,
+    const queryParameters = new URLSearchParams({
+      client_id: config.clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: scope ?? config.scope ?? defaultScope,
       state,
-      ...customConfig,
-      // If scope is provided, it will override the scope in the config.
-      ...conditional(scope && { scope }),
     });
+
+    return `${authorizationEndpoint}?${queryParameters.toString()}`;
   };
 
-const _getUserInfo = async (
-  config: Oauth2ConnectorConfig,
-  token_type: string,
-  access_token: string
+export const getAccessToken = async (
+  config: TwitchConfig,
+  codeObject: { code: string; redirectUri: string }
 ) => {
-  try {
-    const httpResponse = await ky.get(config.userInfoEndpoint, {
-      headers: {
-        authorization: `${token_type} ${access_token}`,
-      },
-      timeout: defaultTimeout,
-    });
+  const { code, redirectUri } = codeObject;
 
-    const rawData = parseJsonObject(await httpResponse.text());
+  const { clientId: client_id, clientSecret: client_secret } = config;
 
-    return { ...userProfileMapping(rawData, config.profileMap), rawData };
-  } catch (error: unknown) {
-    if (error instanceof HTTPError) {
-      throw new ConnectorError(ConnectorErrorCodes.General, JSON.stringify(error.response.body));
-    }
+  const httpResponse = await got.post(accessTokenEndpoint, {
+    form: {
+      client_id,
+      client_secret,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+    },
+    timeout: { request: defaultTimeout },
+  });
 
-    throw error;
+  const result = accessTokenResponseGuard.safeParse(parseJson(httpResponse.body));
+
+  if (!result.success) {
+    throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, result.error);
   }
+
+  const { access_token: accessToken } = result.data;
+
+  assert(accessToken, new ConnectorError(ConnectorErrorCodes.SocialAuthCodeInvalid));
+
+  return { accessToken };
 };
 
 const getUserInfo =
   (getConfig: GetConnectorConfig): GetUserInfo =>
-  async (data, getSession) => {
+  async (data) => {
+    const { code, redirectUri } = await authorizationCallbackHandler(data);
     const config = await getConfig(defaultMetadata.id);
-    validateConfig(config, oauth2ConnectorConfigGuard);
-    const parsedConfig = oauth2ConnectorConfigGuard.parse(config);
+    validateConfig(config, twitchConfigGuard);
+    const { accessToken } = await getAccessToken(config, { code, redirectUri });
 
-    const { redirectUri } = await getSession();
-    assert(
-      redirectUri,
-      new ConnectorError(ConnectorErrorCodes.General, {
-        message: 'Cannot find `redirectUri` from connector session.',
-      })
-    );
+    try {
+      const httpResponse = await got.get(userInfoEndpoint, {
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+        },
+        timeout: { request: defaultTimeout },
+      });
+      const rawData = parseJson(httpResponse.body);
+      const result = userInfoResponseGuard.safeParse(rawData);
 
-    const { access_token, token_type } = await getAccessToken(parsedConfig, data, redirectUri);
-    return _getUserInfo(parsedConfig, token_type, access_token);
+      if (!result.success) {
+        throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, result.error);
+      }
+
+      const { id, login: name, profile_image_url: avatar, email } = result.data.data[0];
+
+      const rawUserInfo = {
+        id,
+        name,
+        avatar,
+        email,
+      };
+
+      const userInfoResult = socialUserInfoGuard.safeParse(rawUserInfo);
+
+      if (!userInfoResult.success) {
+        throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, userInfoResult.error);
+      }
+
+      return { ...userInfoResult.data, rawData };
+    } catch (error: unknown) {
+      if (error instanceof HTTPError) {
+        // @ts-ignore
+        const { statusCode, body: rawBody } = error.response;
+
+        if (statusCode === 401) {
+          throw new ConnectorError(ConnectorErrorCodes.SocialAccessTokenInvalid);
+        }
+
+        throw new ConnectorError(ConnectorErrorCodes.General, JSON.stringify(rawBody));
+      }
+
+      throw error;
+    }
   };
 
-const getTokenResponseAndUserInfo =
-  (getConfig: GetConnectorConfig): GetTokenResponseAndUserInfo =>
-  async (data, getSession) => {
-    const config = await getConfig(defaultMetadata.id);
-    validateConfig(config, oauth2ConnectorConfigGuard);
-    const parsedConfig = oauth2ConnectorConfigGuard.parse(config);
+const authorizationCallbackHandler = async (parameterObject: unknown) => {
+  const result = authResponseGuard.safeParse(parameterObject);
 
-    const { redirectUri } = await getSession();
-    assert(
-      redirectUri,
-      new ConnectorError(ConnectorErrorCodes.General, {
-        message: 'Cannot find `redirectUri` from connector session.',
-      })
-    );
+  if (!result.success) {
+    throw new ConnectorError(ConnectorErrorCodes.General, JSON.stringify(parameterObject));
+  }
 
-    const tokenResponse = await getAccessToken(parsedConfig, data, redirectUri);
+  return result.data;
+};
 
-    const userInfo = await _getUserInfo(
-      parsedConfig,
-      tokenResponse.token_type,
-      tokenResponse.access_token
-    );
-
-    return {
-      tokenResponse,
-      userInfo,
-    };
-  };
-
-const getAccessTokenByRefreshToken =
-  (getConfig: GetConnectorConfig): GetAccessTokenByRefreshToken =>
-  async (refreshToken: string) => {
-    const config = await getConfig(defaultMetadata.id);
-    validateConfig(config, oauth2ConnectorConfigGuard);
-    return _getAccessTokenByRefreshToken(config, refreshToken);
-  };
-
-const createOauthConnector: CreateConnector<SocialConnector> = async ({ getConfig }) => {
+const createTwitchConnector: CreateConnector<SocialConnector> = async ({ getConfig }) => {
   return {
     metadata: defaultMetadata,
     type: ConnectorType.Social,
-    configGuard: oauth2ConnectorConfigGuard,
+    configGuard: twitchConfigGuard,
     getAuthorizationUri: getAuthorizationUri(getConfig),
     getUserInfo: getUserInfo(getConfig),
-    getTokenResponseAndUserInfo: getTokenResponseAndUserInfo(getConfig),
-    getAccessTokenByRefreshToken: getAccessTokenByRefreshToken(getConfig),
   };
 };
 
-export default createOauthConnector;
+export default createTwitchConnector;

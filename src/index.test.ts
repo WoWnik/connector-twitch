@@ -1,96 +1,153 @@
 import nock from 'nock';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { mockConfig } from './mock.js';
+import { ConnectorError, ConnectorErrorCodes } from '@logto/connector-kit';
 
-const getConfig = vi.fn().mockResolvedValue(mockConfig);
+import { accessTokenEndpoint, authorizationEndpoint, userInfoEndpoint } from './constant';
+import createConnector, { getAccessToken } from './index';
+import { mockedConfig } from './mock';
 
-const { default: createConnector } = await import('./index.js');
+const getConfig = vi.fn().mockResolvedValue(mockedConfig);
 
-describe('getAuthorizationUri', () => {
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should get a valid uri by redirectUri and state', async () => {
-    const connector = await createConnector({ getConfig });
-    const setSession = vi.fn();
-    const authorizationUri = await connector.getAuthorizationUri(
-      {
-        state: 'some_state',
-        redirectUri: 'http://localhost:3001/callback',
-        connectorId: 'some_connector_id',
-        connectorFactoryId: 'some_connector_factory_id',
-        jti: 'some_jti',
-        headers: {},
-      },
-      setSession
-    );
-
-    const { origin, pathname, searchParams } = new URL(authorizationUri);
-    expect(origin + pathname).toEqual(mockConfig.authorizationEndpoint);
-    expect(searchParams.get('client_id')).toEqual(mockConfig.clientId);
-    expect(searchParams.get('redirect_uri')).toEqual('http://localhost:3001/callback');
-    expect(searchParams.get('state')).toEqual('some_state');
-    expect(searchParams.get('response_type')).toEqual('code');
-  });
-
-  it('should get a valid uri with custom scope', async () => {
-    const connector = await createConnector({ getConfig });
-    const setSession = vi.fn();
-    const authorizationUri = await connector.getAuthorizationUri(
-      {
-        state: 'some_state',
-        redirectUri: 'http://localhost:3001/callback',
-        scope: 'custom_scope',
-        connectorId: 'some_connector_id',
-        connectorFactoryId: 'some_connector_factory_id',
-        jti: 'some_jti',
-        headers: {},
-      },
-      setSession
-    );
-
-    const { origin, pathname, searchParams } = new URL(authorizationUri);
-    expect(origin + pathname).toEqual(mockConfig.authorizationEndpoint);
-    expect(searchParams.get('client_id')).toEqual(mockConfig.clientId);
-    expect(searchParams.get('redirect_uri')).toEqual('http://localhost:3001/callback');
-    expect(searchParams.get('state')).toEqual('some_state');
-    expect(searchParams.get('response_type')).toEqual('code');
-    expect(searchParams.get('scope')).toEqual('custom_scope');
-  });
-});
-
-describe('getUserInfo', () => {
-  afterEach(() => {
-    nock.cleanAll();
-    vi.clearAllMocks();
-  });
-
-  it('should get valid userInfo', async () => {
-    const userId = 'userId';
-    const tokenEndpointUrl = new URL(mockConfig.tokenEndpoint);
-    nock(tokenEndpointUrl.origin)
-      .post(tokenEndpointUrl.pathname)
-      .query(true)
-      .reply(
-        200,
-        JSON.stringify({
-          access_token: 'access_token',
-          token_type: 'bearer',
-        })
-      );
-    const userInfoEndpointUrl = new URL(mockConfig.userInfoEndpoint);
-    nock(userInfoEndpointUrl.origin).get(userInfoEndpointUrl.pathname).query(true).reply(200, {
-      sub: userId,
-      foo: 'bar',
+describe('Twitch connector', () => {
+  describe('getAuthorizationUri', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
     });
-    const connector = await createConnector({ getConfig });
-    const userInfo = await connector.getUserInfo(
-      { code: 'code' },
-      vi.fn().mockImplementationOnce(() => {
-        return { redirectUri: 'http://localhost:3001/callback' };
-      })
-    );
-    expect(userInfo).toStrictEqual({ id: userId, rawData: { sub: userId, foo: 'bar' } });
+
+    it('should get a valid authorizationUri with redirectUri and state', async () => {
+      const connector = await createConnector({ getConfig });
+      const authorizationUri = await connector.getAuthorizationUri(
+        {
+          state: 'some_state',
+          redirectUri: 'http://localhost:3000/callback',
+          connectorId: 'some_connector_id',
+          connectorFactoryId: 'some_connector_factory_id',
+          jti: 'some_jti',
+          headers: {},
+        },
+        vi.fn()
+      );
+      expect(authorizationUri).toEqual(
+        `${authorizationEndpoint}?client_id=%3Cclient-id%3E&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&response_type=code&scope=identify+email&state=some_state`
+      );
+    });
+
+    it('should get a valid authorizationUri with scope', async () => {
+      const connector = await createConnector({ getConfig });
+      const authorizationUri = await connector.getAuthorizationUri(
+        {
+          state: 'some_state',
+          redirectUri: 'http://localhost:3000/callback',
+          scope: 'custom_scope',
+          connectorId: 'some_connector_id',
+          connectorFactoryId: 'some_connector_factory_id',
+          jti: 'some_jti',
+          headers: {},
+        },
+        vi.fn()
+      );
+      expect(authorizationUri).toEqual(
+        `${authorizationEndpoint}?client_id=%3Cclient-id%3E&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&response_type=code&scope=custom_scope&state=some_state`
+      );
+    });
+  });
+
+  describe('getAccessToken', () => {
+    afterEach(() => {
+      nock.cleanAll();
+      vi.clearAllMocks();
+    });
+
+    it('should get an accessToken by exchanging with code', async () => {
+      nock(accessTokenEndpoint).post('').reply(200, {
+        access_token: 'access_token',
+        scope: 'scope',
+        token_type: 'token_type',
+        expires_in: 3600,
+      });
+
+      const { accessToken } = await getAccessToken(mockedConfig, {
+        code: 'code',
+        redirectUri: 'dummyRedirectUri',
+      });
+      expect(accessToken).toEqual('access_token');
+    });
+
+    it('throws SocialAuthCodeInvalid error if accessToken not found in response', async () => {
+      nock(accessTokenEndpoint).post('').reply(200, {
+        access_token: '',
+        scope: 'scope',
+        token_type: 'token_type',
+        expires_in: 3600,
+      });
+
+      await expect(
+        getAccessToken(mockedConfig, { code: 'code', redirectUri: 'dummyRedirectUri' })
+      ).rejects.toStrictEqual(new ConnectorError(ConnectorErrorCodes.SocialAuthCodeInvalid));
+    });
+  });
+
+  describe('getUserInfo', () => {
+    beforeEach(() => {
+      nock(accessTokenEndpoint).post('').reply(200, {
+        access_token: 'access_token',
+        scope: 'scope',
+        token_type: 'token_type',
+        expires_in: 3600,
+      });
+    });
+
+    afterEach(() => {
+      nock.cleanAll();
+      vi.clearAllMocks();
+    });
+
+    it('should get valid SocialUserInfo', async () => {
+      nock(userInfoEndpoint).get('').reply(200, {
+        id: '1234567890',
+        username: 'Whumpus',
+        avatar: 'avatar_id',
+        email: 'whumpus@twitch.com',
+        verified: true,
+      });
+      const connector = await createConnector({ getConfig });
+      const socialUserInfo = await connector.getUserInfo(
+        {
+          code: 'code',
+          redirectUri: 'dummyRedirectUri',
+        },
+        vi.fn()
+      );
+      expect(socialUserInfo).toStrictEqual({
+        id: '1234567890',
+        name: 'Whumpus',
+        avatar: 'https://cdn.twitchapp.com/avatars/1234567890/avatar_id',
+        email: 'whumpus@twitch.com',
+        rawData: {
+          id: '1234567890',
+          username: 'Whumpus',
+          avatar: 'avatar_id',
+          email: 'whumpus@twitch.com',
+          verified: true,
+        },
+      });
+    });
+
+    it('throws SocialAccessTokenInvalid error if remote response code is 401', async () => {
+      nock(userInfoEndpoint).get('').reply(401);
+      const connector = await createConnector({ getConfig });
+      await expect(
+        connector.getUserInfo({ code: 'code', redirectUri: 'dummyRedirectUri' }, vi.fn())
+      ).rejects.toStrictEqual(new ConnectorError(ConnectorErrorCodes.SocialAccessTokenInvalid));
+    });
+
+    it('throws unrecognized error', async () => {
+      nock(userInfoEndpoint).get('').reply(500);
+      const connector = await createConnector({ getConfig });
+      await expect(
+        connector.getUserInfo({ code: 'code', redirectUri: 'dummyRedirectUri' }, vi.fn())
+      ).rejects.toThrow();
+    });
   });
 });

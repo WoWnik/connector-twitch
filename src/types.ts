@@ -1,48 +1,53 @@
+import type { Nullable, Optional } from '@silverhand/essentials';
 import { z } from 'zod';
 
-import { oauth2ConfigGuard } from './oauth2/types.js';
+const nullishToUndefined = <T = unknown>(input: Nullable<T>): Optional<T> => {
+  if (!input) {
+    return;
+  }
 
-export const profileMapGuard = z
-  .object({
-    id: z.string().optional().default('id'),
-    email: z.string().optional().default('email'),
-    phone: z.string().optional().default('phone'),
-    name: z.string().optional().default('name'),
-    avatar: z.string().optional().default('avatar'),
-  })
-  .optional()
-  .default({
-    id: 'id',
-    email: 'email',
-    phone: 'phone',
-    name: 'name',
-    avatar: 'avatar',
-  });
+  return input;
+};
 
-export type ProfileMap = z.infer<typeof profileMapGuard>;
-
-export const userProfileGuard = z.object({
-  id: z.string().or(z.number()).transform(String),
-  email: z.string().optional(),
-  phone: z.string().optional(),
-  name: z.string().optional(),
-  avatar: z.string().optional(),
+export const twitchConfigGuard = z.object({
+  clientId: z.string(),
+  clientSecret: z.string(),
+  scope: z.string().optional(),
 });
 
-export type UserProfile = z.infer<typeof userProfileGuard>;
+export type TwitchConfig = z.infer<typeof twitchConfigGuard>;
 
-const tokenEndpointResponseTypeGuard = z
-  .enum(['query-string', 'json'])
-  .optional()
-  .default('query-string');
-
-export type TokenEndpointResponseType = z.input<typeof tokenEndpointResponseTypeGuard>;
-
-export const oauth2ConnectorConfigGuard = oauth2ConfigGuard.extend({
-  userInfoEndpoint: z.string(),
-  tokenEndpointResponseType: tokenEndpointResponseTypeGuard,
-  profileMap: profileMapGuard,
-  customConfig: z.record(z.string()).optional(),
+export const accessTokenResponseGuard = z.object({
+  access_token: z.string(),
+  token_type: z.string(),
+  expires_in: z.number(),
+  scope: z.string(),
 });
 
-export type Oauth2ConnectorConfig = z.infer<typeof oauth2ConnectorConfigGuard>;
+export type AccessTokenResponse = z.infer<typeof accessTokenResponseGuard>;
+
+export const userInfoResponseGuard = z.object({
+  data: z.array({
+    id: z.string(),
+    login: z.string().nullish().transform(nullishToUndefined),
+    display_name: z.string().nullish().transform(nullishToUndefined),
+    type: z.string().nullish().transform(nullishToUndefined),
+    broadcaster_type: z.string().nullish().transform(nullishToUndefined),
+    // @ts-ignore
+    description: z.string().nullish().transform(nullishToUndefined),
+    profile_image_url: z.string().nullish().transform(nullishToUndefined),
+    offline_image_url: z.string().nullish().transform(nullishToUndefined),
+    view_count: z.number().nullish().transform(nullishToUndefined),
+    email: z.string().nullish().transform(nullishToUndefined),
+    created_at: z.string().nullish().transform(nullishToUndefined),
+  }),
+});
+
+export type UserInfoResponse = z.infer<typeof userInfoResponseGuard>;
+
+export const authorizationCallbackErrorGuard = z.object({
+  error: z.string(),
+  error_description: z.string(),
+});
+
+export const authResponseGuard = z.object({ code: z.string(), redirectUri: z.string() });
