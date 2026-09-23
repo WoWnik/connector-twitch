@@ -16,11 +16,11 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "eslint --ext .ts src",
-    "lint:report": "pnpm lint --format json --output-file report.json",
+    "lint:report": "npm run lint --format json --output-file report.json",
     "test": "vitest run src",
     "test:watch": "vitest src --watch",
-    "test:ci": "pnpm run test --silent --coverage",
-    "prepublishOnly": "pnpm build"
+    "test:ci": "npm run test --silent --coverage",
+    "prepublishOnly": "npm run build"
   },
   "eslintConfig": {
     "extends": "@silverhand",
