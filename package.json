@@ -1,5 +1,5 @@
 {
-  "name": "@wownik/connector-twitch",
+  "name": "@wownikcompany/connector-twitch",
   "version": "1.0.0",
   "description": "Custom Twitch connector implementation for Logto",
   "author": "wownik <wownik98@gmail.com>",
@@ -13,7 +13,7 @@
   "scripts": {
     "precommit": "lint-staged",
     "check": "tsc --noEmit",
-    "build": "tsup",
+    "build": "tsup src/index.ts",
     "dev": "tsup --watch",
     "lint": "eslint --ext .ts src",
     "lint:report": "npm run lint --format json --output-file report.json",
