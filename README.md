@@ -4,6 +4,10 @@
 
 This connector enables Logto to authenticate users using their Twitch accounts, sync profile information (display name, avatar, email), and optionally store access tokens for API access through Logto [Secret Vault](https://docs.logto.io/secret-vault).
 
+## How to install:
+
+`npm run cli connector add @wownikcompany/connector-twitch`
+
 ## Important Note
 
 - This is **NOT** an official Twitch connector
