@@ -60,12 +60,14 @@ describe('Twitch connector', () => {
     });
 
     it('should get an accessToken by exchanging with code', async () => {
-      nock(accessTokenEndpoint).post('').reply(200, {
-        access_token: 'access_token',
-        scope: 'scope',
-        token_type: 'token_type',
-        expires_in: 3600,
-      });
+      nock(accessTokenEndpoint)
+        .post('')
+        .reply(200, {
+          access_token: 'access_token',
+          scope: ['scope'],
+          token_type: 'token_type',
+          expires_in: 3600,
+        });
 
       const { accessToken } = await getAccessToken(mockedConfig, {
         code: 'code',
@@ -75,12 +77,14 @@ describe('Twitch connector', () => {
     });
 
     it('throws SocialAuthCodeInvalid error if accessToken not found in response', async () => {
-      nock(accessTokenEndpoint).post('').reply(200, {
-        access_token: '',
-        scope: 'scope',
-        token_type: 'token_type',
-        expires_in: 3600,
-      });
+      nock(accessTokenEndpoint)
+        .post('')
+        .reply(200, {
+          access_token: '',
+          scope: ['scope'],
+          token_type: 'token_type',
+          expires_in: 3600,
+        });
 
       await expect(
         getAccessToken(mockedConfig, { code: 'code', redirectUri: 'dummyRedirectUri' })
@@ -90,12 +94,14 @@ describe('Twitch connector', () => {
 
   describe('getUserInfo', () => {
     beforeEach(() => {
-      nock(accessTokenEndpoint).post('').reply(200, {
-        access_token: 'access_token',
-        scope: 'scope',
-        token_type: 'token_type',
-        expires_in: 3600,
-      });
+      nock(accessTokenEndpoint)
+        .post('')
+        .reply(200, {
+          access_token: 'access_token',
+          scope: ['scope'],
+          token_type: 'token_type',
+          expires_in: 3600,
+        });
     });
 
     afterEach(() => {
@@ -104,13 +110,25 @@ describe('Twitch connector', () => {
     });
 
     it('should get valid SocialUserInfo', async () => {
-      nock(userInfoEndpoint).get('').reply(200, {
-        id: '1234567890',
-        username: 'Whumpus',
-        avatar: 'avatar_id',
-        email: 'whumpus@twitch.com',
-        verified: true,
-      });
+      nock(userInfoEndpoint)
+        .get('')
+        .reply(200, {
+          data: [
+            {
+              id: '1234567890',
+              login: 'whumpus',
+              display_name: 'Whumpus',
+              type: '',
+              broadcaster_type: '',
+              description: '',
+              profile_image_url: 'avatar_id',
+              offline_image_url: 'avatar_id',
+              view_count: 0,
+              email: 'whumpus@twitch.com',
+              created_at: '',
+            },
+          ],
+        });
       const connector = await createConnector({ getConfig });
       const socialUserInfo = await connector.getUserInfo(
         {
@@ -121,15 +139,25 @@ describe('Twitch connector', () => {
       );
       expect(socialUserInfo).toStrictEqual({
         id: '1234567890',
-        name: 'Whumpus',
-        avatar: 'https://cdn.twitchapp.com/avatars/1234567890/avatar_id',
+        name: 'whumpus',
+        avatar: 'avatar_id',
         email: 'whumpus@twitch.com',
         rawData: {
-          id: '1234567890',
-          username: 'Whumpus',
-          avatar: 'avatar_id',
-          email: 'whumpus@twitch.com',
-          verified: true,
+          data: [
+            {
+              id: '1234567890',
+              login: 'whumpus',
+              display_name: 'Whumpus',
+              type: '',
+              broadcaster_type: '',
+              description: '',
+              profile_image_url: 'avatar_id',
+              offline_image_url: 'avatar_id',
+              view_count: 0,
+              email: 'whumpus@twitch.com',
+              created_at: '',
+            },
+          ],
         },
       });
     });

@@ -21,13 +21,13 @@ export const accessTokenResponseGuard = z.object({
   access_token: z.string(),
   token_type: z.string(),
   expires_in: z.number(),
-  scope: z.string(),
+  scope: z.array(z.string()),
 });
 
 export type AccessTokenResponse = z.infer<typeof accessTokenResponseGuard>;
 
 export const userInfoResponseGuard = z.object({
-  data: z.array({
+  data: z.array(z.object({
     id: z.string(),
     login: z.string().nullish().transform(nullishToUndefined),
     display_name: z.string().nullish().transform(nullishToUndefined),
@@ -40,7 +40,7 @@ export const userInfoResponseGuard = z.object({
     view_count: z.number().nullish().transform(nullishToUndefined),
     email: z.string().nullish().transform(nullishToUndefined),
     created_at: z.string().nullish().transform(nullishToUndefined),
-  }),
+  })),
 });
 
 export type UserInfoResponse = z.infer<typeof userInfoResponseGuard>;
