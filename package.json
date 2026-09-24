@@ -1,6 +1,6 @@
 {
   "name": "@wownikcompany/connector-twitch",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Custom Twitch connector implementation for Logto",
   "author": "wownik <wownik98@gmail.com>",
   "license": "MIT License",

@@ -94,6 +94,7 @@ const getUserInfo =
       const httpResponse = await got.get(userInfoEndpoint, {
         headers: {
           authorization: `Bearer ${accessToken}`,
+          'Client-Id': config.clientId,
         },
         timeout: { request: defaultTimeout },
       });
