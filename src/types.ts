@@ -13,15 +13,17 @@ export const twitchConfigGuard = z.object({
   clientId: z.string(),
   clientSecret: z.string(),
   scope: z.string().optional(),
+  customConfig: z.record(z.string()).optional(),
 });
 
 export type TwitchConfig = z.infer<typeof twitchConfigGuard>;
 
 export const accessTokenResponseGuard = z.object({
   access_token: z.string(),
-  token_type: z.string(),
   expires_in: z.number(),
+  refresh_token: z.string(),
   scope: z.array(z.string()),
+  token_type: z.string(),
 });
 
 export type AccessTokenResponse = z.infer<typeof accessTokenResponseGuard>;

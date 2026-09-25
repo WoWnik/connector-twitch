@@ -29,7 +29,7 @@ describe('Twitch connector', () => {
         vi.fn()
       );
       expect(authorizationUri).toEqual(
-        `${authorizationEndpoint}?client_id=%3Cclient-id%3E&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&response_type=code&scope=identify+email&state=some_state`
+        `${authorizationEndpoint}?response_type=code&client_id=%3Cclient-id%3E&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&scope=openid+user%3Aread%3Aemail&state=some_state`
       );
     });
 
@@ -48,7 +48,7 @@ describe('Twitch connector', () => {
         vi.fn()
       );
       expect(authorizationUri).toEqual(
-        `${authorizationEndpoint}?client_id=%3Cclient-id%3E&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&response_type=code&scope=custom_scope&state=some_state`
+        `${authorizationEndpoint}?response_type=code&client_id=%3Cclient-id%3E&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&scope=custom_scope&state=some_state`
       );
     });
   });
@@ -64,16 +64,17 @@ describe('Twitch connector', () => {
         .post('')
         .reply(200, {
           access_token: 'access_token',
+          expires_in: 3600,
+          refresh_token: "refresh_token",
           scope: ['scope'],
           token_type: 'token_type',
-          expires_in: 3600,
         });
 
-      const { accessToken } = await getAccessToken(mockedConfig, {
+      const { access_token } = await getAccessToken(mockedConfig, {
         code: 'code',
         redirectUri: 'dummyRedirectUri',
       });
-      expect(accessToken).toEqual('access_token');
+      expect(access_token).toEqual('access_token');
     });
 
     it('throws SocialAuthCodeInvalid error if accessToken not found in response', async () => {
@@ -81,9 +82,10 @@ describe('Twitch connector', () => {
         .post('')
         .reply(200, {
           access_token: '',
+          expires_in: 3600,
+          refresh_token: 'refresh_token',
           scope: ['scope'],
           token_type: 'token_type',
-          expires_in: 3600,
         });
 
       await expect(
@@ -98,9 +100,10 @@ describe('Twitch connector', () => {
         .post('')
         .reply(200, {
           access_token: 'access_token',
+          expires_in: 3600,
+          refresh_token: 'refresh_token',
           scope: ['scope'],
           token_type: 'token_type',
-          expires_in: 3600,
         });
     });
 

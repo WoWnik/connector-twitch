@@ -3,10 +3,15 @@ import { got, HTTPError } from 'got';
 
 import type {
   CreateConnector,
+  GetAccessTokenByRefreshToken,
   GetAuthorizationUri,
   GetConnectorConfig,
+  GetSession,
+  GetTokenResponseAndUserInfo,
   GetUserInfo,
   SocialConnector,
+  SocialUserInfo,
+  TokenResponse,
 } from '@logto/connector-kit';
 import {
   ConnectorError,
@@ -35,14 +40,14 @@ import {
 
 const getAuthorizationUri =
   (getConfig: GetConnectorConfig): GetAuthorizationUri =>
-  async ({ state, redirectUri, scope }) => {
+  async ({ state, redirectUri, scope }): Promise<string> => {
     const config = await getConfig(defaultMetadata.id);
     validateConfig(config, twitchConfigGuard);
 
     const queryParameters = new URLSearchParams({
+      response_type: 'code',
       client_id: config.clientId,
       redirect_uri: redirectUri,
-      response_type: 'code',
       scope: scope ?? config.scope ?? defaultScope,
       state,
     });
@@ -53,18 +58,19 @@ const getAuthorizationUri =
 export const getAccessToken = async (
   config: TwitchConfig,
   codeObject: { code: string; redirectUri: string }
-) => {
+): Promise<TokenResponse> => {
   const { code, redirectUri } = codeObject;
 
-  const { clientId: client_id, clientSecret: client_secret } = config;
+  const { clientId: client_id, clientSecret: client_secret, customConfig } = config;
 
   const httpResponse = await got.post(accessTokenEndpoint, {
     form: {
       client_id,
       client_secret,
-      grant_type: 'authorization_code',
       code,
+      grant_type: 'authorization_code',
       redirect_uri: redirectUri,
+      ...customConfig,
     },
     timeout: { request: defaultTimeout },
   });
@@ -75,25 +81,44 @@ export const getAccessToken = async (
     throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, result.error);
   }
 
-  const { access_token: accessToken } = result.data;
+  if (!result.data.access_token){
+    assert(result.data.access_token, new ConnectorError(ConnectorErrorCodes.SocialAuthCodeInvalid));
+  }
 
-  assert(accessToken, new ConnectorError(ConnectorErrorCodes.SocialAuthCodeInvalid));
-
-  return { accessToken };
+  return {
+    access_token: result.data.access_token,
+    refresh_token: result.data.refresh_token,
+    expires_in: result.data.expires_in,
+    scope: result.data.scope.join(','),
+    token_type: result.data.token_type,
+  };
 };
 
 const getUserInfo =
   (getConfig: GetConnectorConfig): GetUserInfo =>
-  async (data) => {
+  async (data, getSession: GetSession): Promise<SocialUserInfo> => {
+    const { userInfo } = await getTokenResponseAndUserInfo(getConfig)(data, getSession);
+    return userInfo;
+  };
+
+const getTokenResponseAndUserInfo =
+  (getConfig: GetConnectorConfig): GetTokenResponseAndUserInfo =>
+  async (
+    data,
+    getSession: GetSession
+  ): Promise<{
+    tokenResponse?: TokenResponse;
+    userInfo: SocialUserInfo;
+  }> => {
     const { code, redirectUri } = await authorizationCallbackHandler(data);
     const config = await getConfig(defaultMetadata.id);
     validateConfig(config, twitchConfigGuard);
-    const { accessToken } = await getAccessToken(config, { code, redirectUri });
+    const tokenResponse: TokenResponse = await getAccessToken(config, { code, redirectUri });
 
     try {
       const httpResponse = await got.get(userInfoEndpoint, {
         headers: {
-          authorization: `Bearer ${accessToken}`,
+          authorization: `Bearer ${tokenResponse.access_token}`,
           'Client-Id': config.clientId,
         },
         timeout: { request: defaultTimeout },
@@ -120,13 +145,21 @@ const getUserInfo =
         throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, userInfoResult.error);
       }
 
-      return { ...userInfoResult.data, rawData };
+      const userInfo: SocialUserInfo = { ...userInfoResult.data, rawData };
+
+      return {
+        tokenResponse,
+        userInfo,
+      };
     } catch (error: unknown) {
       if (error instanceof HTTPError) {
         // @ts-ignore
         const { statusCode, body: rawBody } = error.response;
 
         if (statusCode === 401) {
+          console.log(
+            `Unauthorized access token: ${tokenResponse.access_token}, clientId: ${config.clientId}`
+          );
           throw new ConnectorError(ConnectorErrorCodes.SocialAccessTokenInvalid);
         }
 
@@ -135,6 +168,38 @@ const getUserInfo =
 
       throw error;
     }
+  };
+
+const getAccessTokenByRefreshToken =
+  (getConfig: GetConnectorConfig): GetAccessTokenByRefreshToken =>
+  async (refreshToken: string): Promise<TokenResponse> => {
+    const config = await getConfig(defaultMetadata.id);
+    validateConfig(config, twitchConfigGuard);
+    const { clientId: client_id, clientSecret: client_secret, customConfig } = config;
+
+    const httpResponse = await got.post(accessTokenEndpoint, {
+      form: {
+        client_id,
+        client_secret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      },
+      timeout: { request: defaultTimeout },
+    });
+
+    const result = accessTokenResponseGuard.safeParse(parseJson(httpResponse.body));
+
+    if (!result.success) {
+      throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, result.error);
+    }
+
+    return {
+      access_token: result.data.access_token,
+      refresh_token: result.data.refresh_token,
+      expires_in: result.data.expires_in,
+      scope: result.data.scope.join(','),
+      token_type: result.data.token_type,
+    };
   };
 
 const authorizationCallbackHandler = async (parameterObject: unknown) => {
@@ -154,6 +219,8 @@ const createTwitchConnector: CreateConnector<SocialConnector> = async ({ getConf
     configGuard: twitchConfigGuard,
     getAuthorizationUri: getAuthorizationUri(getConfig),
     getUserInfo: getUserInfo(getConfig),
+    getTokenResponseAndUserInfo: getTokenResponseAndUserInfo(getConfig),
+    getAccessTokenByRefreshToken: getAccessTokenByRefreshToken(getConfig),
   };
 };
 

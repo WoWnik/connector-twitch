@@ -1,9 +1,10 @@
 {
   "name": "@wownikcompany/connector-twitch",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Custom Twitch connector implementation for Logto",
   "author": "wownik <wownik98@gmail.com>",
   "license": "MIT License",
+  "github": "https://github.com/wownik/connector-twitch",
   "type": "module",
   "files": [
     "lib",

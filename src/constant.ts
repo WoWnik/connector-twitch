@@ -13,7 +13,7 @@ export const userInfoEndpoint = 'https://api.twitch.tv/helix/users';
  * OAuth2 Scopes
  * https://dev.twitch.tv/docs/authentication/scopes/
  */
-export const scope = 'identify email';
+export const scope = 'openid user:read:email';
 
 export const defaultMetadata: ConnectorMetadata = {
   id: 'twitch-universal',
@@ -52,7 +52,17 @@ export const defaultMetadata: ConnectorMetadata = {
       placeholder: 'Enter the scopes (separated by a space)',
       description: "The `scope` determines permissions granted by the user's authorization.",
     },
+    {
+      key: 'customConfig',
+      type: ConnectorConfigFormItemType.Json,
+      required: false,
+      label: 'Custom Config',
+      defaultValue: {
+        force_verify: true,
+      },
+    },
   ],
+  isTokenStorageSupported: true,
 };
 
 export const defaultTimeout = 5000;
