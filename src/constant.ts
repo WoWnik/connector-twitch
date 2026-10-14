@@ -13,7 +13,7 @@ export const userInfoEndpoint = 'https://api.twitch.tv/helix/users';
  * OAuth2 Scopes
  * https://dev.twitch.tv/docs/authentication/scopes/
  */
-export const scope = 'openid user:read:email';
+export const scope = 'user:read:email user:read:chat user:bot channel:bot';
 
 export const defaultMetadata: ConnectorMetadata = {
   id: 'twitch-universal',
@@ -51,6 +51,7 @@ export const defaultMetadata: ConnectorMetadata = {
       label: 'Scope',
       placeholder: 'Enter the scopes (separated by a space)',
       description: "The `scope` determines permissions granted by the user's authorization.",
+      defaultValue: scope,
     },
     {
       key: 'customConfig',

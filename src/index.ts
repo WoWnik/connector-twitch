@@ -30,13 +30,14 @@ import {
   scope as defaultScope,
   userInfoEndpoint,
 } from './constant.js';
-import type { TwitchConfig } from './types.js';
+import { AccessTokenResponse, AuthResponse, TwitchConfig, UserInfoResponse } from './types.js';
 import {
   accessTokenResponseGuard,
   authResponseGuard,
   twitchConfigGuard,
   userInfoResponseGuard,
 } from './types.js';
+import { SafeParseReturnType } from 'zod';
 
 const getAuthorizationUri =
   (getConfig: GetConnectorConfig): GetAuthorizationUri =>
@@ -57,16 +58,15 @@ const getAuthorizationUri =
 
 export const getAccessToken = async (
   config: TwitchConfig,
-  codeObject: { code: string; redirectUri: string }
+  codeObject: AuthResponse
 ): Promise<TokenResponse> => {
   const { code, redirectUri } = codeObject;
-
-  const { clientId: client_id, clientSecret: client_secret, customConfig } = config;
+  const { clientId, clientSecret, customConfig } = config;
 
   const httpResponse = await got.post(accessTokenEndpoint, {
     form: {
-      client_id,
-      client_secret,
+      client_id: clientId,
+      client_secret: clientSecret,
       code,
       grant_type: 'authorization_code',
       redirect_uri: redirectUri,
@@ -75,15 +75,18 @@ export const getAccessToken = async (
     timeout: { request: defaultTimeout },
   });
 
-  const result = accessTokenResponseGuard.safeParse(parseJson(httpResponse.body));
+  const result: SafeParseReturnType<any, AccessTokenResponse> = accessTokenResponseGuard.safeParse(
+    parseJson(httpResponse.body)
+  );
 
   if (!result.success) {
     throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, result.error);
   }
 
-  if (!result.data.access_token){
-    assert(result.data.access_token, new ConnectorError(ConnectorErrorCodes.SocialAuthCodeInvalid));
-  }
+  assert(
+    result.data.access_token,
+    new ConnectorError(ConnectorErrorCodes.SocialAuthCodeInvalid, result.data)
+  );
 
   return {
     access_token: result.data.access_token,
@@ -96,7 +99,7 @@ export const getAccessToken = async (
 
 const getUserInfo =
   (getConfig: GetConnectorConfig): GetUserInfo =>
-  async (data, getSession: GetSession): Promise<SocialUserInfo> => {
+  async (data: unknown, getSession: GetSession): Promise<SocialUserInfo> => {
     const { userInfo } = await getTokenResponseAndUserInfo(getConfig)(data, getSession);
     return userInfo;
   };
@@ -104,27 +107,28 @@ const getUserInfo =
 const getTokenResponseAndUserInfo =
   (getConfig: GetConnectorConfig): GetTokenResponseAndUserInfo =>
   async (
-    data,
+    data: unknown,
     getSession: GetSession
   ): Promise<{
     tokenResponse?: TokenResponse;
     userInfo: SocialUserInfo;
   }> => {
-    const { code, redirectUri } = await authorizationCallbackHandler(data);
-    const config = await getConfig(defaultMetadata.id);
+    const authResponse: AuthResponse = await authorizationCallbackHandler(data);
+    const config: TwitchConfig = await getConfig(defaultMetadata.id);
     validateConfig(config, twitchConfigGuard);
-    const tokenResponse: TokenResponse = await getAccessToken(config, { code, redirectUri });
+    const tokenResponse: TokenResponse = await getAccessToken(config, authResponse);
 
     try {
       const httpResponse = await got.get(userInfoEndpoint, {
         headers: {
-          'Authorization': `Bearer ${tokenResponse.access_token}`,
+          Authorization: `Bearer ${tokenResponse.access_token}`,
           'Client-Id': config.clientId,
         },
         timeout: { request: defaultTimeout },
       });
       const rawData = parseJson(httpResponse.body);
-      const result = userInfoResponseGuard.safeParse(rawData);
+      const result: SafeParseReturnType<any, UserInfoResponse> =
+        userInfoResponseGuard.safeParse(rawData);
 
       if (!result.success) {
         throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, result.error);
@@ -157,10 +161,10 @@ const getTokenResponseAndUserInfo =
         const { statusCode, body: rawBody } = error.response;
 
         if (statusCode === 401) {
-          console.info(
+          throw new ConnectorError(
+            ConnectorErrorCodes.SocialAccessTokenInvalid,
             `Unauthorized access token: ${tokenResponse.access_token}, clientId: ${config.clientId}`
           );
-          throw new ConnectorError(ConnectorErrorCodes.SocialAccessTokenInvalid);
         }
 
         throw new ConnectorError(ConnectorErrorCodes.General, JSON.stringify(rawBody));
@@ -202,11 +206,11 @@ const getAccessTokenByRefreshToken =
     };
   };
 
-const authorizationCallbackHandler = async (parameterObject: unknown) => {
-  const result = authResponseGuard.safeParse(parameterObject);
+const authorizationCallbackHandler = async (data: unknown): Promise<AuthResponse> => {
+  const result: SafeParseReturnType<any, AuthResponse> = authResponseGuard.safeParse(data);
 
   if (!result.success) {
-    throw new ConnectorError(ConnectorErrorCodes.General, JSON.stringify(parameterObject));
+    throw new ConnectorError(ConnectorErrorCodes.General, JSON.stringify(data));
   }
 
   return result.data;
