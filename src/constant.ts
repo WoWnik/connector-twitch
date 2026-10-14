@@ -59,7 +59,7 @@ export const defaultMetadata: ConnectorMetadata = {
       required: false,
       label: 'Custom Config',
       defaultValue: {
-        force_verify: true,
+        force_verify: "true",
       },
     },
   ],

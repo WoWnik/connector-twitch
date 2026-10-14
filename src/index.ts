@@ -51,6 +51,7 @@ const getAuthorizationUri =
       redirect_uri: redirectUri,
       scope: scope ?? config.scope ?? defaultScope,
       state,
+      ...config.customConfig,
     });
 
     return `${authorizationEndpoint}?${queryParameters.toString()}`;
@@ -60,17 +61,14 @@ export const getAccessToken = async (
   config: TwitchConfig,
   codeObject: AuthResponse
 ): Promise<TokenResponse> => {
-  const { code, redirectUri } = codeObject;
-  const { clientId, clientSecret, customConfig } = config;
-
   const httpResponse = await got.post(accessTokenEndpoint, {
     form: {
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
       grant_type: 'authorization_code',
-      redirect_uri: redirectUri,
-      ...customConfig,
+      code: codeObject.code,
+      redirect_uri: codeObject.redirectUri,
+      ...config.customConfig,
     },
     timeout: { request: defaultTimeout },
   });
