@@ -16,9 +16,9 @@ export const userInfoEndpoint = 'https://api.twitch.tv/helix/users';
 export const scope = 'user:read:email user:read:chat user:bot channel:bot';
 
 export const defaultMetadata: ConnectorMetadata = {
-  id: 'twitch-universal',
+  id: 'twitch-web',
   target: 'twitch',
-  platform: ConnectorPlatform.Universal,
+  platform: ConnectorPlatform.Web,
   name: {
     en: 'Twitch',
   },

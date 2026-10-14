@@ -1,7 +1,7 @@
 {
   "packageManager": "pnpm@12.11.2",
   "name": "@wownikcompany/connector-twitch",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Custom Twitch connector implementation for Logto",
   "author": "wownik <wownik98@gmail.com>",
   "license": "MIT License",
