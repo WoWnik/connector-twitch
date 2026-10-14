@@ -89,7 +89,7 @@ export const getAccessToken = async (
     access_token: result.data.access_token,
     refresh_token: result.data.refresh_token,
     expires_in: result.data.expires_in,
-    scope: result.data.scope.join(','),
+    scope: result.data.scope.join(' '),
     token_type: result.data.token_type,
   };
 };
@@ -118,7 +118,7 @@ const getTokenResponseAndUserInfo =
     try {
       const httpResponse = await got.get(userInfoEndpoint, {
         headers: {
-          authorization: `Bearer ${tokenResponse.access_token}`,
+          'Authorization': `Bearer ${tokenResponse.access_token}`,
           'Client-Id': config.clientId,
         },
         timeout: { request: defaultTimeout },
@@ -157,7 +157,7 @@ const getTokenResponseAndUserInfo =
         const { statusCode, body: rawBody } = error.response;
 
         if (statusCode === 401) {
-          console.log(
+          console.info(
             `Unauthorized access token: ${tokenResponse.access_token}, clientId: ${config.clientId}`
           );
           throw new ConnectorError(ConnectorErrorCodes.SocialAccessTokenInvalid);
